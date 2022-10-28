@@ -32,8 +32,8 @@
 #include "src/core/SkTDPQueue.h"
 #include "src/utils/SkUTF.h"
 
-#include <hb.h>
-#include <hb-ot.h>
+#include <harfbuzz/hb.h>
+#include <harfbuzz/hb-ot.h>
 #include <cstring>
 #include <memory>
 #include <type_traits>

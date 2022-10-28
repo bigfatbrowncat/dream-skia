@@ -9,8 +9,8 @@
 #include "include/private/SkTo.h"
 #include "src/utils/SkCallableTraits.h"
 
-#include "hb.h"
-#include "hb-subset.h"
+#include "harfbuzz/hb.h"
+#include "harfbuzz/hb-subset.h"
 
 template <class T, void(*P)(T*)> using resource =
     std::unique_ptr<T, SkFunctionWrapper<std::remove_pointer_t<decltype(P)>, P>>;

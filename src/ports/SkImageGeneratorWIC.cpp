@@ -18,7 +18,7 @@
 // but CLSID_WICImagingFactory is then #defined to CLSID_WICImagingFactory2.
 // Undo this #define if it has been done so that we link against the symbols
 // we intended to link against on all SDKs.
-#if defined(CLSID_WICImagingFactory)
+#if defined(CLSID_WICImagingFactory) && !defined(__MINGW32__)
     #undef CLSID_WICImagingFactory
 #endif
 
