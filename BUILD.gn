@@ -1185,7 +1185,7 @@ optional("pdf") {
 }
 
 optional("xps") {
-  enabled = skia_use_xps && is_win && !is_mingw
+  enabled = skia_use_xps && is_win
   public_defines = [ "SK_SUPPORT_XPS" ]
   public = skia_xps_public
   sources = skia_xps_sources
