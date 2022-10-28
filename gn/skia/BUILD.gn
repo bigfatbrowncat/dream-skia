@@ -60,10 +60,14 @@ config("default") {
   # Disable warnings about unknown attributes.
   # (These unknown attribute warnings are on by default, so we don't make
   # disabling them part of :warnings, as some targets remove :warnings.)
-  if (is_win && !is_clang) {
+  if (is_win && !is_clang && !is_mingw) {
     cflags += [ "/wd5030" ]
   } else {
     cflags += [ "-Wno-attributes" ]
+  }
+  
+  if (is_mingw) {
+    defines += [ "__fastfail=exit" ]
   }
 
   if (is_fuchsia && using_fuchsia_sdk) {
@@ -90,27 +94,50 @@ config("default") {
     if (is_clang && target_cpu == "arm64") {
       cflags += [ "--target=arm64-windows" ]
     }
-    cflags += [
-      "/bigobj",  # Some of our files are bigger than the regular limits.
-      "/utf-8",  # Set Source and Executable character sets to UTF-8.
-    ]
-    cflags_cc += [ "/std:c++17" ]
+    if (!is_mingw){
+      cflags += [
+        "/bigobj",  # Some of our files are bigger than the regular limits.
+        "/utf-8",  # Set Source and Executable character sets to UTF-8.
+      ]
+    } else {
+      cflags += [
+        "-fstrict-aliasing",
+        "-fPIC",
+        "-fvisibility=hidden",
+      ]
+    }
+
+    if (is_mingw){
+      cflags_c += [
+        "-fvisibility-inlines-hidden",
+      ]
+      cflags_cc += [
+        "-std=c++17",
+      ]
+    } else {
+        cflags_cc += [ "/std:c++17" ]
+    }
+
     defines += [
       "_CRT_SECURE_NO_WARNINGS",  # Disables warnings about sscanf().
       "_HAS_EXCEPTIONS=0",  # Disables exceptions in MSVC STL.
       "WIN32_LEAN_AND_MEAN",
       "NOMINMAX",
     ]
+ 
+    if (!is_mingw){
+        _include_dirs = [
+          "$win_vc/Tools/MSVC/$win_toolchain_version/include",
+          "$win_sdk/Include/$win_sdk_version/shared",
+          "$win_sdk/Include/$win_sdk_version/ucrt",
+          "$win_sdk/Include/$win_sdk_version/um",
+          "$win_sdk/Include/$win_sdk_version/winrt",
+        ]
+    } else {
+      _include_dirs = []
+    }
 
-    _include_dirs = [
-      "$win_vc/Tools/MSVC/$win_toolchain_version/include",
-      "$win_sdk/Include/$win_sdk_version/shared",
-      "$win_sdk/Include/$win_sdk_version/ucrt",
-      "$win_sdk/Include/$win_sdk_version/um",
-      "$win_sdk/Include/$win_sdk_version/winrt",
-    ]
-
-    if (is_clang) {
+    if (is_clang && !is_mingw) {
       foreach(dir, _include_dirs) {
         cflags += [
           "-imsvc",
@@ -121,11 +148,15 @@ config("default") {
       include_dirs = _include_dirs
     }
 
-    lib_dirs = [
-      "$win_sdk/Lib/$win_sdk_version/ucrt/$target_cpu",
-      "$win_sdk/Lib/$win_sdk_version/um/$target_cpu",
-      "$win_vc/Tools/MSVC/$win_toolchain_version/lib/$target_cpu",
-    ]
+    if (!is_mingw){
+      lib_dirs = [
+        "$win_sdk/Lib/$win_sdk_version/ucrt/$target_cpu",
+        "$win_sdk/Lib/$win_sdk_version/um/$target_cpu",
+        "$win_vc/Tools/MSVC/$win_toolchain_version/lib/$target_cpu",
+      ]
+    } else {
+      lib_dirs = []
+    }
   } else {
     cflags += [
       "-fstrict-aliasing",
@@ -144,7 +175,7 @@ config("default") {
       "-mfpu=neon",
       "-mthumb",
     ]
-  } else if (current_cpu == "x86" && !is_win) {
+  } else if (current_cpu == "x86" && is_mingw) {
     asmflags += [ "-m32" ]
     cflags += [
       "-m32",
@@ -154,7 +185,7 @@ config("default") {
     ldflags += [ "-m32" ]
   }
 
-  if (malloc != "" && !is_win) {
+  if (malloc != "" && is_mingw) {
     cflags += [
       "-fno-builtin-malloc",
       "-fno-builtin-calloc",
@@ -352,7 +383,7 @@ config("recover_pointer_overflow") {
 
 config("no_exceptions") {
   # Exceptions are disabled by default on Windows.  (Use /EHsc to enable them.)
-  if (!is_win) {
+  if (is_mingw || !is_win) {
     cflags_cc = [ "-fno-exceptions" ]
     cflags_objcc = cflags_cc
   }
@@ -365,14 +396,14 @@ config("warnings") {
   cflags_objcc = []
 
   if (werror) {
-    if (is_win) {
+    if (!is_mingw && is_win) {
       cflags += [ "/WX" ]
     } else {
       cflags += [ "-Werror" ]
     }
   }
 
-  if (is_win) {
+  if (is_win && !is_mingw) {
     cflags += [
       "/W3",  # Turn on lots of warnings.
 
@@ -577,7 +608,7 @@ config("debug_symbols") {
       "-gline-tables-only",
       "-funwind-tables",  # Helps make in-process backtraces fuller.
     ]
-  } else if (is_win) {
+  } else if (is_win && !is_mingw) {
     cflags = [ "/Z7" ]
     if (is_clang) {
       cflags += [ "-gcodeview-ghash" ]
@@ -592,7 +623,7 @@ config("debug_symbols") {
 
 config("no_rtti") {
   if (sanitize != "ASAN") {  # -fsanitize=vptr requires RTTI
-    if (is_win) {
+    if (is_win && !is_mingw) {
       cflags_cc = [ "/GR-" ]
     } else {
       cflags_cc = [ "-fno-rtti" ]
@@ -602,7 +633,7 @@ config("no_rtti") {
 }
 
 config("optimize") {
-  if (is_win) {
+  if (is_win && !is_mingw) {
     cflags = [
       "/O2",
       "/Zc:inline",
@@ -642,7 +673,7 @@ config("executable") {
       "-rdynamic",
       "-Wl,-rpath,\$ORIGIN",
     ]
-  } else if (is_win) {
+  } else if (is_win && !is_mingw) {
     ldflags = [
       "/SUBSYSTEM:CONSOLE",  # Quiet "no subsystem specified; CONSOLE assumed".
       "/INCREMENTAL:NO",  # Quiet warnings about failing to incrementally link

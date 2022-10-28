@@ -322,6 +322,10 @@ template("gcc_like_toolchain") {
       if (is_mac || is_ios) {
         rpath = "-Wl,-install_name,@rpath/$soname"
       }
+      if (is_mingw) {
+        rpath = ""  # For PE/COFF the soname argument has no effect
+      }
+
 
       rspfile = "{{output}}.rsp"
       rspfile_content = "{{inputs}}"
@@ -339,13 +343,27 @@ template("gcc_like_toolchain") {
         _end_group = ""
       }
 
-      command = "$link -shared {{ldflags}} $_start_group @$rspfile {{frameworks}} {{solibs}} $_end_group {{libs}} $rpath -o {{output}}"
+      _mingw_flags = ""
+      if (is_mingw) {
+        # Have MinGW linker generate a .def file and a .a import library
+        if (!is_clang) {
+          _mingw_flags += " -Wl,--dll "
+        }
+        _mingw_flags +=
+            " -Wl,--output-def=$soname.def -Wl,--out-implib=$soname.a "
+      }
+
+      command = "$link -shared {{ldflags}} $_start_group @$rspfile {{frameworks}} {{solibs}} $_end_group $_mingw_flags {{libs}} $rpath -o {{output}}"
       outputs = [ "{{root_out_dir}}/$soname" ]
       output_prefix = "lib"
       if (is_mac || is_ios) {
         default_output_extension = ".dylib"
       } else {
-        default_output_extension = ".so"
+        if (!is_mingw) {
+          default_output_extension = ".so"
+        } else {
+          default_output_extension = ".dll"
+        }
       }
       description = "link {{output}}"
       if (0 <= link_pool_depth) {

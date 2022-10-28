@@ -13,6 +13,9 @@ declare_args() {
 if (skia_use_system_harfbuzz) {
   system("harfbuzz") {
     include_dirs = [ "/usr/include/harfbuzz" ]
+    if (is_mingw) {
+      include_dirs += [ "/usr/include/../clang64/include/harfbuzz" ]
+    }
     libs = [ "harfbuzz" ]
     if (skia_pdf_subset_harfbuzz) {
       libs += [ "harfbuzz-subset" ]
